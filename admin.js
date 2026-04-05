@@ -1,0 +1,499 @@
+/* ═══════════════════════════════════════════════
+   BAR LM — Admin Panel Logic
+   ═══════════════════════════════════════════════ */
+
+let inventarioGlobal = [];
+let imagenRecortada = null; // Blob after crop+compress
+let cropperInstance = null;
+
+// Categorias base (las mismas del menu publico)
+const CATEGORIAS_BASE = {
+    cafes_calientes: 'Cafés Calientes',
+    cafes_frios: 'Cafés Fríos',
+    cocteles_sin_alcohol: 'Cocteles Sin Alcohol',
+    cocteles_con_alcohol: 'Cocteles Con Alcohol',
+    cocteles_vodka: 'Con Vodka',
+    cocteles_cerveza: 'Con Cerveza',
+    cocteles_vino: 'Con Vino',
+    cocteles_ginebra: 'Con Ginebra',
+    cocteles_tequila: 'Con Tequila',
+    cocteles_whisky: 'Con Whisky',
+    entrantes: 'Entrantes',
+    hamburguesas: 'Hamburguesas',
+    entremes: 'Entremés',
+    tacos: 'Tacos Mexicanos',
+    pizzas: 'Pizzas',
+    cervezas: 'Cervezas',
+    vinos: 'Vinos',
+    refrescantes: 'Refrescantes',
+    otras_bebidas: 'Otras Bebidas'
+};
+
+// ─── AUTH ───────────────────────────────────────
+
+async function checkAuth() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+        window.location.href = 'login.html';
+        return;
+    }
+    cargarAdmin();
+}
+
+async function cerrarSesion() {
+    await supabaseClient.auth.signOut();
+    window.location.href = 'login.html';
+}
+
+// ─── LOAD INVENTORY ─────────────────────────────
+
+async function cargarAdmin() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('productos')
+            .select('*')
+            .eq('activo', true)
+            .eq('restaurant_id', CONFIG.RESTAURANT_ID)
+            .order('categoria', { ascending: true })
+            .order('destacado', { ascending: false })
+            .order('id', { ascending: false });
+
+        if (error) throw error;
+
+        inventarioGlobal = data || [];
+        poblarCategorias();
+        renderInventario(inventarioGlobal);
+    } catch (err) {
+        document.getElementById('inventory-list').innerHTML =
+            '<p class="loading-msg" style="color:var(--danger)">Error al cargar inventario.</p>';
+    }
+}
+
+// ─── CATEGORIAS DINAMICAS ───────────────────────
+
+function poblarCategorias() {
+    // Extraer categorias unicas de productos + las base
+    const categoriasSet = new Set(Object.keys(CATEGORIAS_BASE));
+    inventarioGlobal.forEach(p => {
+        if (p.categoria) categoriasSet.add(p.categoria);
+    });
+
+    const categorias = [...categoriasSet].sort();
+
+    // Poblar datalist del formulario
+    const datalist = document.getElementById('lista-categorias');
+    datalist.innerHTML = categorias.map(cat => {
+        const label = CATEGORIAS_BASE[cat] || cat;
+        return `<option value="${cat}">${label}</option>`;
+    }).join('');
+
+    // Poblar select del filtro de inventario
+    const filterSelect = document.getElementById('filter-categoria');
+    const valorActual = filterSelect.value;
+    filterSelect.innerHTML = '<option value="">Todas las categorías</option>' +
+        categorias.map(cat => {
+            const label = CATEGORIAS_BASE[cat] || cat;
+            return `<option value="${cat}">${label}</option>`;
+        }).join('');
+    filterSelect.value = valorActual;
+}
+
+// ─── RENDER INVENTORY ───────────────────────────
+
+function renderInventario(lista) {
+    const container = document.getElementById('inventory-list');
+    const countEl = document.getElementById('inventory-count');
+    countEl.textContent = `${lista.length} producto${lista.length !== 1 ? 's' : ''}`;
+
+    if (!lista.length) {
+        container.innerHTML = '<p class="loading-msg">No hay productos.</p>';
+        return;
+    }
+
+    const estadoLabel = { disponible: 'DISPONIBLE', agotado: 'AGOTADO' };
+    const estadoClass = { disponible: 'badge-dispo', agotado: 'badge-agot' };
+    const defaultImg = 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=100&h=100&fit=crop';
+
+    container.innerHTML = lista.map(p => {
+        const estado = (p.estado === 'agotado') ? 'agotado' : 'disponible';
+        return `
+        <div class="inventory-item">
+            <img class="inv-thumb" src="${p.imagen_url || defaultImg}" alt="${p.nombre}" onerror="this.src='${defaultImg}'">
+            <div class="inv-info">
+                <span class="inv-name">${p.destacado ? '★ ' : ''}${p.nombre}</span>
+                <span class="inv-price">$${Number(p.precio).toLocaleString('es-CU')}</span>
+            </div>
+            <span class="inv-badge ${estadoClass[estado]}">${estadoLabel[estado]}</span>
+            <div class="inv-actions">
+                <button class="icon-btn" onclick="editarProducto(${p.id})" title="Editar">
+                    <span class="material-icons">edit</span>
+                </button>
+                <button class="icon-btn" onclick="toggleDestacado(${p.id})" title="Destacar">
+                    <span class="material-icons">${p.destacado ? 'star' : 'star_border'}</span>
+                </button>
+                <button class="icon-btn" onclick="toggleEstado(${p.id})" title="Cambiar estado">
+                    <span class="material-icons">sync</span>
+                </button>
+                <button class="icon-btn icon-btn--danger" onclick="eliminarProducto(${p.id})" title="Eliminar">
+                    <span class="material-icons">delete</span>
+                </button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ─── FILTER INVENTORY (search + category) ───────
+
+function filtrarInventario() {
+    const cat = document.getElementById('filter-categoria').value;
+    const busqueda = document.getElementById('search-inventario').value.trim().toLowerCase();
+
+    let filtered = inventarioGlobal;
+
+    if (cat) {
+        filtered = filtered.filter(p => p.categoria === cat);
+    }
+
+    if (busqueda) {
+        filtered = filtered.filter(p => p.nombre.toLowerCase().includes(busqueda));
+    }
+
+    renderInventario(filtered);
+}
+
+// ─── SAVE / UPDATE PRODUCT ──────────────────────
+
+async function guardarProducto() {
+    const btn = document.getElementById('btn-guardar');
+    const idEdicion = document.getElementById('edit-id').value;
+
+    const nombre = document.getElementById('prod-nombre').value.trim();
+    const precio = parseFloat(document.getElementById('prod-precio').value);
+    const categoria = document.getElementById('prod-categoria').value.trim().toLowerCase().replace(/\s+/g, '_');
+    const estado = document.getElementById('prod-estado').value;
+    const descripcion = document.getElementById('prod-descripcion').value.trim();
+    const destacado = document.getElementById('prod-destacado').checked;
+
+    // Validation
+    if (!nombre || !precio || !categoria) {
+        alert('Complete los campos obligatorios: Nombre, Precio y Categoría.');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Procesando...';
+
+    try {
+        let urlImagen = null;
+
+        // Upload cropped+compressed image if available
+        if (imagenRecortada) {
+            const nombreArchivo = `barlm_${Date.now()}.jpg`;
+
+            console.log('Subiendo imagen:', nombreArchivo, 'Size:', (imagenRecortada.size / 1024).toFixed(0), 'KB');
+
+            const { error: upErr } = await supabaseClient.storage
+                .from('imagenes')
+                .upload(nombreArchivo, imagenRecortada, {
+                    contentType: 'image/jpeg',
+                    upsert: true
+                });
+
+            if (upErr) {
+                console.error('Error subiendo imagen:', upErr);
+                throw new Error('Error al subir imagen: ' + upErr.message);
+            }
+
+            const { data: urlData } = supabaseClient.storage
+                .from('imagenes')
+                .getPublicUrl(nombreArchivo);
+
+            urlImagen = urlData.publicUrl;
+            console.log('URL generada:', urlImagen);
+        }
+
+        const datos = {
+            nombre,
+            precio,
+            categoria,
+            estado,
+            descripcion,
+            destacado,
+            restaurant_id: CONFIG.RESTAURANT_ID
+        };
+
+        if (urlImagen) datos.imagen_url = urlImagen;
+
+        if (idEdicion) {
+            const { error } = await supabaseClient
+                .from('productos')
+                .update(datos)
+                .eq('id', parseInt(idEdicion));
+
+            if (error) throw error;
+            alert('Producto actualizado.');
+        } else {
+            datos.activo = true;
+            if (!urlImagen) datos.imagen_url = '';
+            const { error } = await supabaseClient
+                .from('productos')
+                .insert([datos]);
+
+            if (error) throw error;
+            alert('Producto creado.');
+        }
+
+        limpiarFormulario();
+        await cargarAdmin();
+
+    } catch (err) {
+        alert('Error: ' + (err.message || 'No se pudo guardar.'));
+    }
+
+    btn.disabled = false;
+    btn.textContent = idEdicion ? 'ACTUALIZAR' : 'GUARDAR';
+}
+
+// ─── EDIT PRODUCT ───────────────────────────────
+
+function editarProducto(id) {
+    const p = inventarioGlobal.find(item => item.id === id);
+    if (!p) return;
+
+    document.getElementById('edit-id').value = p.id;
+    document.getElementById('prod-nombre').value = p.nombre;
+    document.getElementById('prod-precio').value = p.precio;
+    document.getElementById('prod-categoria').value = p.categoria;
+    document.getElementById('prod-estado').value = (p.estado === 'agotado') ? 'agotado' : 'disponible';
+    document.getElementById('prod-descripcion').value = p.descripcion || '';
+    document.getElementById('prod-destacado').checked = p.destacado || false;
+
+    const previewImg = document.getElementById('preview-img');
+    if (p.imagen_url) {
+        previewImg.src = p.imagen_url;
+        previewImg.style.display = 'block';
+    } else {
+        previewImg.style.display = 'none';
+    }
+
+    imagenRecortada = null;
+    document.getElementById('btn-guardar').textContent = 'ACTUALIZAR';
+    document.getElementById('btn-cancelar').style.display = 'block';
+
+    document.querySelector('.upload-zone').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelarEdicion() {
+    limpiarFormulario();
+}
+
+function limpiarFormulario() {
+    document.getElementById('edit-id').value = '';
+    document.getElementById('prod-nombre').value = '';
+    document.getElementById('prod-precio').value = '';
+    document.getElementById('prod-categoria').value = '';
+    document.getElementById('prod-estado').value = 'disponible';
+    document.getElementById('prod-descripcion').value = '';
+    document.getElementById('prod-destacado').checked = false;
+    document.getElementById('prod-imagen').value = '';
+    document.getElementById('preview-img').style.display = 'none';
+    document.getElementById('btn-guardar').textContent = 'GUARDAR';
+    document.getElementById('btn-cancelar').style.display = 'none';
+    document.querySelector('.upload-text').textContent = 'Click o arrastra imagen';
+    document.querySelector('.upload-icon').style.display = 'block';
+    imagenRecortada = null;
+}
+
+// ─── TOGGLE ESTADO (only disponible <-> agotado) ─
+
+async function toggleEstado(id) {
+    const p = inventarioGlobal.find(item => item.id === id);
+    if (!p) return;
+
+    const nuevoEstado = (p.estado === 'agotado') ? 'disponible' : 'agotado';
+
+    try {
+        const { error } = await supabaseClient
+            .from('productos')
+            .update({ estado: nuevoEstado })
+            .eq('id', id);
+
+        if (error) throw error;
+        await cargarAdmin();
+    } catch (err) {
+        alert('Error al cambiar estado.');
+    }
+}
+
+// ─── TOGGLE DESTACADO ───────────────────────────
+
+async function toggleDestacado(id) {
+    const p = inventarioGlobal.find(item => item.id === id);
+    if (!p) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('productos')
+            .update({ destacado: !p.destacado })
+            .eq('id', id);
+
+        if (error) throw error;
+        await cargarAdmin();
+    } catch (err) {
+        alert('Error al cambiar destacado.');
+    }
+}
+
+// ─── DELETE (SOFT) ──────────────────────────────
+
+async function eliminarProducto(id) {
+    if (!confirm('¿Eliminar este producto del menú?')) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('productos')
+            .update({ activo: false })
+            .eq('id', id);
+
+        if (error) throw error;
+        await cargarAdmin();
+    } catch (err) {
+        alert('Error al eliminar producto.');
+    }
+}
+
+// ─── IMAGE CROPPER + COMPRESSION ────────────────
+
+function abrirCropper(imageSrc) {
+    const modal = document.getElementById('modal-cropper');
+    const img = document.getElementById('cropper-image');
+
+    img.src = imageSrc;
+    modal.classList.add('active');
+
+    // Wait for image to load then init cropper
+    img.onload = () => {
+        if (cropperInstance) cropperInstance.destroy();
+        cropperInstance = new Cropper(img, {
+            viewMode: 1,
+            dragMode: 'move',
+            autoCropArea: 0.9,
+            responsive: true,
+            background: false,
+            guides: true
+        });
+    };
+}
+
+function cancelarCrop() {
+    const modal = document.getElementById('modal-cropper');
+    modal.classList.remove('active');
+    if (cropperInstance) {
+        cropperInstance.destroy();
+        cropperInstance = null;
+    }
+    // Reset file input
+    document.getElementById('prod-imagen').value = '';
+    document.querySelector('.upload-text').textContent = 'Click o arrastra imagen';
+    document.querySelector('.upload-icon').style.display = 'block';
+}
+
+async function confirmarCrop() {
+    if (!cropperInstance) return;
+
+    const canvas = cropperInstance.getCroppedCanvas({
+        maxWidth: 800,
+        maxHeight: 800
+    });
+
+    // Compress iteratively to hit 20-100KB target
+    imagenRecortada = await comprimirImagen(canvas);
+
+    // Show preview
+    const previewImg = document.getElementById('preview-img');
+    previewImg.src = URL.createObjectURL(imagenRecortada);
+    previewImg.style.display = 'block';
+
+    const sizeKB = (imagenRecortada.size / 1024).toFixed(0);
+    document.querySelector('.upload-text').textContent = `Imagen lista (${sizeKB} KB)`;
+    document.querySelector('.upload-icon').style.display = 'none';
+
+    // Close modal
+    document.getElementById('modal-cropper').classList.remove('active');
+    cropperInstance.destroy();
+    cropperInstance = null;
+}
+
+function comprimirImagen(canvas) {
+    return new Promise((resolve) => {
+        const targetMaxKB = 100;
+        const targetMinKB = 20;
+        let quality = 0.8;
+
+        function intentar() {
+            canvas.toBlob((blob) => {
+                const sizeKB = blob.size / 1024;
+
+                if (sizeKB > targetMaxKB && quality > 0.1) {
+                    // Too big, reduce quality
+                    quality -= 0.1;
+                    intentar();
+                } else if (sizeKB < targetMinKB && quality < 0.95) {
+                    // Too small, increase quality
+                    quality += 0.05;
+                    intentar();
+                } else {
+                    resolve(blob);
+                }
+            }, 'image/jpeg', quality);
+        }
+
+        intentar();
+    });
+}
+
+// ─── INIT ───────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    checkAuth();
+
+    const fileInput = document.getElementById('prod-imagen');
+    const wrapper = document.getElementById('upload-wrapper');
+    const uploadText = document.querySelector('.upload-text');
+    const uploadIcon = document.querySelector('.upload-icon');
+
+    // Click to upload
+    wrapper.addEventListener('click', (e) => {
+        if (e.target !== fileInput) fileInput.click();
+    });
+
+    // File selected → open cropper
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                abrirCropper(e.target.result);
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+        }
+    });
+
+    // Drag & drop
+    wrapper.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        wrapper.classList.add('drag-over');
+    });
+
+    wrapper.addEventListener('dragleave', () => {
+        wrapper.classList.remove('drag-over');
+    });
+
+    wrapper.addEventListener('drop', (e) => {
+        e.preventDefault();
+        wrapper.classList.remove('drag-over');
+        if (e.dataTransfer.files[0]) {
+            fileInput.files = e.dataTransfer.files;
+            fileInput.dispatchEvent(new Event('change'));
+        }
+    });
+});

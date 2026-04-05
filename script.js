@@ -7,6 +7,12 @@ let todosLosProductos = [];
 let productoActual = null;
 let puntuacionSeleccionada = 0;
 
+function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
 // === CATEGORY CONFIG ===
 const CATEGORIAS = {
     cafes_calientes:       { nombre: 'Cafés Calientes', icono: '☕', quote: '"Tu cerebro dice agua, tu corazón dice tequila, pero el reloj dice café."' },
@@ -84,11 +90,15 @@ function renderizarMenu(lista) {
         return;
     }
 
-    Object.keys(CATEGORIAS).forEach(catKey => {
+    // Collect all categories: hardcoded + any new from products
+    const allCatKeys = new Set(Object.keys(CATEGORIAS));
+    lista.forEach(p => { if (p.categoria) allCatKeys.add(p.categoria); });
+
+    [...allCatKeys].forEach(catKey => {
         const items = lista.filter(p => p.categoria === catKey);
         if (items.length === 0) return;
 
-        const cat = CATEGORIAS[catKey];
+        const cat = CATEGORIAS[catKey] || { nombre: catKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), icono: '🍽️', quote: '' };
         const section = document.createElement('div');
         section.className = 'category-section';
         section.id = `section-${catKey}`;
@@ -100,22 +110,20 @@ function renderizarMenu(lista) {
             <div class="horizontal-scroll">
                 ${items.map(item => {
                     const esAgotado = item.estado === 'agotado';
-                    const esProximamente = item.estado === 'proximamente';
-                    const claseEstado = esAgotado ? 'is-agotado' : esProximamente ? 'is-proximamente' : '';
+                    const claseEstado = esAgotado ? 'is-agotado' : '';
                     const clickable = !esAgotado;
 
                     return `
                         <div class="card ${claseEstado}" ${clickable ? `onclick="abrirDetalle(${item.id})"` : ''}>
                             <div class="card-img-container">
                                 ${esAgotado ? '<div class="badge-agotado"><span>AGOTADO</span></div>' : ''}
-                                ${esProximamente ? '<div class="badge-proximamente"><span>PRÓXIMAMENTE</span></div>' : ''}
                                 <img src="${item.imagen_url || 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop'}" alt="${item.nombre}" loading="lazy">
                                 ${item.destacado ? '<span class="tag-top">TOP</span>' : ''}
                             </div>
                             <div class="card-body">
                                 <h3>${item.nombre}</h3>
                                 <div class="card-footer">
-                                    <span class="card-price">${item.precio > 0 ? '$' + item.precio.toLocaleString() : ''}</span>
+                                    <span class="card-price">${item.precio > 0 ? '$' + item.precio.toLocaleString() : 'GRATIS'}</span>
                                     ${item.ratingPromedio ? `<span class="card-rating">★ ${item.ratingPromedio}</span>` : ''}
                                 </div>
                             </div>
@@ -140,7 +148,7 @@ async function abrirDetalle(id) {
 
     document.getElementById('det-titulo').textContent = productoActual.nombre;
     document.getElementById('det-desc').textContent = productoActual.descripcion || '';
-    document.getElementById('det-price').textContent = `$${productoActual.precio.toLocaleString()}`;
+    document.getElementById('det-price').textContent = productoActual.precio > 0 ? `$${productoActual.precio.toLocaleString()}` : 'GRATIS';
     document.getElementById('det-img').src = productoActual.imagen_url || 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop';
 
     // Calcular promedio real desde Supabase
@@ -272,10 +280,10 @@ async function abrirListaOpiniones() {
         contenedor.innerHTML = opiniones.map(op => `
             <div style="background:rgba(255,255,255,0.03); padding:14px; border-radius:10px; margin-bottom:10px; border-left:3px solid var(--neon-primary);">
                 <div style="display:flex; justify-content:space-between;">
-                    <strong style="color:var(--text-primary); font-size:0.9rem;">${op.cliente_nombre || 'Anónimo'}</strong>
+                    <strong style="color:var(--text-primary); font-size:0.9rem;">${esc(op.cliente_nombre || 'Anónimo')}</strong>
                     <span style="color:#fbbf24; font-size:0.8rem;">${'★'.repeat(op.puntuacion)}</span>
                 </div>
-                <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:6px;">"${op.comentario || 'Sin comentario.'}"</p>
+                <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:6px;">"${esc(op.comentario || 'Sin comentario.')}"</p>
             </div>
         `).join('');
 
@@ -393,6 +401,50 @@ function irAlInicio(btn) {
     renderizarMenu(todosLosProductos);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// ══════════════════════════════════════════════════
+// 11. CERRAR MODALES CON ESCAPE
+// ══════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const detalle = document.getElementById('modal-detalle');
+    const opinion = document.getElementById('modal-opinion');
+    const reviews = document.getElementById('modal-reviews');
+
+    if (reviews && reviews.classList.contains('active')) { cerrarReviews(); return; }
+    if (opinion && opinion.classList.contains('active')) { cerrarOpinion(); return; }
+    if (detalle && detalle.classList.contains('active')) { cerrarDetalle(); return; }
+});
+
+// ══════════════════════════════════════════════════
+// 12. HOVER PREVIEW EN ESTRELLAS
+// ══════════════════════════════════════════════════
+document.addEventListener('mouseover', e => {
+    const star = e.target.closest('#stars-container span');
+    if (!star) return;
+    const val = parseInt(star.dataset.val);
+    document.querySelectorAll('#stars-container span').forEach((s, i) => {
+        s.classList.toggle('lit', i < val);
+    });
+});
+
+document.addEventListener('mouseout', e => {
+    const star = e.target.closest('#stars-container span');
+    if (!star) return;
+    // Restore to selected rating
+    document.querySelectorAll('#stars-container span').forEach((s, i) => {
+        s.classList.toggle('lit', i < puntuacionSeleccionada);
+    });
+});
+
+// ══════════════════════════════════════════════════
+// 13. BOTON VOLVER ARRIBA
+// ══════════════════════════════════════════════════
+window.addEventListener('scroll', () => {
+    const fab = document.getElementById('fab-top');
+    if (!fab) return;
+    fab.classList.toggle('visible', window.scrollY > 400);
+});
 
 // ══════════════════════════════════════════════════
 // INIT
