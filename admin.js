@@ -188,15 +188,22 @@ async function guardarProducto() {
 
         // Upload cropped+compressed image if available
         if (imagenRecortada) {
-            const nombreArchivo = `barlm_${Date.now()}.jpg`;
+            // Verify auth session before upload
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
+                alert('Sesión expirada. Inicie sesión de nuevo.');
+                window.location.href = 'login.html';
+                return;
+            }
+            console.log('Sesión activa, rol:', session.user.role);
 
+            const nombreArchivo = `barlm_${Date.now()}.jpg`;
             console.log('Subiendo imagen:', nombreArchivo, 'Size:', (imagenRecortada.size / 1024).toFixed(0), 'KB');
 
             const { error: upErr } = await supabaseClient.storage
-                .from('imagenes')
+                .from('BarLM')
                 .upload(nombreArchivo, imagenRecortada, {
-                    contentType: 'image/jpeg',
-                    upsert: true
+                    contentType: 'image/jpeg'
                 });
 
             if (upErr) {
@@ -205,7 +212,7 @@ async function guardarProducto() {
             }
 
             const { data: urlData } = supabaseClient.storage
-                .from('imagenes')
+                .from('BarLM')
                 .getPublicUrl(nombreArchivo);
 
             urlImagen = urlData.publicUrl;
