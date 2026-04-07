@@ -4,4 +4,5 @@ const CONFIG = {
     RESTAURANT_ID: '5b1b7ba9-eb12-4848-80f2-597149d52f3e'
 };
 
+// Cliente público (menú) - usa publishable key
 const supabaseClient = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);

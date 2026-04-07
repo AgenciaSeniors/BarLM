@@ -50,6 +50,8 @@ async function iniciarSesion(e) {
             return;
         }
 
+        // Guardar sesion en sessionStorage (no depende de Supabase localStorage)
+        sessionStorage.setItem('barlm_session', data.session.access_token);
         window.location.href = 'admin.html';
     } catch (err) {
         errorMsg.textContent = 'Error de conexión. Intente más tarde.';
@@ -59,10 +61,9 @@ async function iniciarSesion(e) {
 }
 
 // Si ya tiene sesion, redirigir directo
-(async () => {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session) window.location.href = 'admin.html';
-})();
+if (sessionStorage.getItem('barlm_session')) {
+    window.location.href = 'admin.html';
+}
 </script>
 
 </body>

@@ -6,6 +6,13 @@ let inventarioGlobal = [];
 let imagenRecortada = null; // Blob after crop+compress
 let cropperInstance = null;
 
+// Escapar HTML para prevenir XSS
+function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
 // Categorias base (las mismas del menu publico)
 const CATEGORIAS_BASE = {
     cafes_calientes: 'Cafés Calientes',
@@ -31,17 +38,16 @@ const CATEGORIAS_BASE = {
 
 // ─── AUTH ───────────────────────────────────────
 
-async function checkAuth() {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (!session) {
+function checkAuth() {
+    if (!sessionStorage.getItem('barlm_session')) {
         window.location.href = 'login.html';
         return;
     }
     cargarAdmin();
 }
 
-async function cerrarSesion() {
-    await supabaseClient.auth.signOut();
+function cerrarSesion() {
+    sessionStorage.removeItem('barlm_session');
     window.location.href = 'login.html';
 }
 
@@ -118,9 +124,9 @@ function renderInventario(lista) {
         const estado = (p.estado === 'agotado') ? 'agotado' : 'disponible';
         return `
         <div class="inventory-item">
-            <img class="inv-thumb" src="${p.imagen_url || defaultImg}" alt="${p.nombre}" onerror="this.src='${defaultImg}'">
+            <img class="inv-thumb" src="${p.imagen_url || defaultImg}" alt="${esc(p.nombre)}" onerror="this.src='${defaultImg}'">
             <div class="inv-info">
-                <span class="inv-name">${p.destacado ? '★ ' : ''}${p.nombre}</span>
+                <span class="inv-name">${p.destacado ? '★ ' : ''}${esc(p.nombre)}</span>
                 <span class="inv-price">$${Number(p.precio).toLocaleString('es-CU')}</span>
             </div>
             <span class="inv-badge ${estadoClass[estado]}">${estadoLabel[estado]}</span>
@@ -188,17 +194,7 @@ async function guardarProducto() {
 
         // Upload cropped+compressed image if available
         if (imagenRecortada) {
-            // Verify auth session before upload
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) {
-                alert('Sesión expirada. Inicie sesión de nuevo.');
-                window.location.href = 'login.html';
-                return;
-            }
-            console.log('Sesión activa, rol:', session.user.role);
-
             const nombreArchivo = `barlm_${Date.now()}.jpg`;
-            console.log('Subiendo imagen:', nombreArchivo, 'Size:', (imagenRecortada.size / 1024).toFixed(0), 'KB');
 
             const { error: upErr } = await supabaseClient.storage
                 .from('BarLM')
@@ -207,7 +203,6 @@ async function guardarProducto() {
                 });
 
             if (upErr) {
-                console.error('Error subiendo imagen:', upErr);
                 throw new Error('Error al subir imagen: ' + upErr.message);
             }
 
@@ -216,7 +211,6 @@ async function guardarProducto() {
                 .getPublicUrl(nombreArchivo);
 
             urlImagen = urlData.publicUrl;
-            console.log('URL generada:', urlImagen);
         }
 
         const datos = {
