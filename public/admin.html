@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bar LM | Panel Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+</head>
+<body class="admin-body">
+
+<!-- ═══ HEADER ═══ -->
+<header class="admin-header">
+    <div class="admin-header-left">
+        <h1 class="admin-brand">BAR LM</h1>
+        <span class="admin-badge">ADMIN</span>
+    </div>
+    <div class="admin-header-right">
+        <span id="sync-status" style="font-size:0.7rem; color:var(--text-muted); margin-right:6px;"></span>
+        <button class="admin-link" onclick="syncToSupabase()" title="Sincronizar con nube" style="cursor:pointer; background:none; font-family:var(--font-body);">
+            <span class="material-icons" style="font-size:16px; vertical-align:middle; margin-right:2px;">cloud_upload</span> SINCRONIZAR
+        </button>
+        <a href="index.html" class="admin-link" target="_blank">Ver Menu</a>
+        <button class="admin-logout" onclick="cerrarSesion()" title="Cerrar sesion">
+            <span class="material-icons">logout</span>
+        </button>
+    </div>
+</header>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div class="dashboard-grid">
+
+    <!-- LEFT: Product Form -->
+    <section class="upload-zone">
+        <h2 class="zone-title">Producto</h2>
+        <input type="hidden" id="edit-id">
+
+        <label class="field-label">Nombre *</label>
+        <input type="text" id="prod-nombre" class="input-lm" placeholder="Nombre del producto" required>
+
+        <label class="field-label">Precio (CUP) *</label>
+        <input type="number" id="prod-precio" class="input-lm" placeholder="0" min="0" step="1" required>
+
+        <label class="field-label">Categoria *</label>
+        <input type="text" id="prod-categoria" class="input-lm" list="lista-categorias" placeholder="Escriba o seleccione categoria" required>
+        <datalist id="lista-categorias"></datalist>
+
+        <label class="field-label">Estado</label>
+        <select id="prod-estado" class="input-lm">
+            <option value="disponible">Disponible</option>
+            <option value="agotado">Agotado</option>
+        </select>
+
+        <label class="field-label">Imagen</label>
+        <div class="file-upload-wrapper" id="upload-wrapper">
+            <span class="material-icons upload-icon">cloud_upload</span>
+            <p class="upload-text">Click o arrastra imagen</p>
+            <input type="file" id="prod-imagen" accept="image/*">
+            <img id="preview-img" class="preview-thumb" src="" alt="" style="display:none;">
+        </div>
+
+        <label class="field-label">Descripcion</label>
+        <textarea id="prod-descripcion" class="input-lm" placeholder="Descripcion del producto (opcional)" rows="3"></textarea>
+
+        <label class="field-check">
+            <input type="checkbox" id="prod-destacado">
+            <span>Producto destacado (TOP)</span>
+        </label>
+
+        <button type="button" class="btn-guardar" id="btn-guardar" onclick="guardarProducto()">GUARDAR</button>
+        <button type="button" class="btn-cancelar" id="btn-cancelar" onclick="cancelarEdicion()" style="display:none;">CANCELAR</button>
+    </section>
+
+    <!-- RIGHT: Inventory -->
+    <section class="inventory-zone">
+        <div class="inventory-header">
+            <h2 class="zone-title">Inventario</h2>
+            <span id="inventory-count" class="inventory-count">0 productos</span>
+        </div>
+        <div class="inventory-filters">
+            <input type="text" id="search-inventario" class="input-lm input-sm" placeholder="Buscar producto..." oninput="filtrarInventario()">
+            <select id="filter-categoria" class="input-lm input-sm" onchange="filtrarInventario()">
+                <option value="">Todas las categorias</option>
+            </select>
+        </div>
+        <div id="inventory-list" class="inventory-list">
+            <p class="loading-msg">Cargando inventario...</p>
+        </div>
+    </section>
+
+</div>
+
+<!-- ═══ CROPPER MODAL ═══ -->
+<div id="modal-cropper" class="modal-cropper-overlay">
+    <div class="modal-cropper-card">
+        <h3 class="zone-title" style="margin-bottom:12px;">Recortar imagen</h3>
+        <div class="cropper-container-wrapper">
+            <img id="cropper-image" src="" alt="Recortar">
+        </div>
+        <div class="cropper-actions">
+            <button type="button" class="btn-cancelar" onclick="cancelarCrop()" style="display:inline-block;width:auto;flex:1;">CANCELAR</button>
+            <button type="button" class="btn-guardar" onclick="confirmarCrop()" style="width:auto;flex:1;">RECORTAR</button>
+        </div>
+    </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>
