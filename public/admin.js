@@ -391,11 +391,14 @@ async function checkSyncStatus() {
 
         const data = await res.json();
 
-        if (data.pendientes > 0) {
-            statusEl.textContent = `${data.pendientes} cambio${data.pendientes !== 1 ? 's' : ''} pendiente${data.pendientes !== 1 ? 's' : ''}`;
+        // data.pendientes es un objeto {productos, opiniones, imagenes, total}
+        const total = data.pendientes?.total ?? data.pendientes ?? 0;
+
+        if (total > 0) {
+            statusEl.textContent = `${total} cambio${total !== 1 ? 's' : ''} pendiente${total !== 1 ? 's' : ''}`;
             statusEl.style.color = 'var(--gold)';
         } else {
-            statusEl.textContent = data.lastSync ? 'Sincronizado' : 'Sin cambios';
+            statusEl.textContent = data.ultimoSync ? 'Sincronizado' : 'Sin cambios';
             statusEl.style.color = 'var(--text-muted)';
         }
     } catch (err) {
