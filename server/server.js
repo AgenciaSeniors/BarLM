@@ -50,6 +50,9 @@ app.use('/', express.static(path.join(__dirname, '..')));
 // Imágenes subidas localmente por el admin
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Imágenes estáticas del proyecto (logo, placeholders, etc.)
+app.use('/img', express.static(path.join(__dirname, '..', 'public', 'img')));
+
 // Librerías vendor (ej: supabase-js para modo online)
 app.use('/vendor', express.static(path.join(__dirname, 'vendor')));
 

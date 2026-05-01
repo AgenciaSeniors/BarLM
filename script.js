@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════
-// BAR LM — MENU ENGINE (Supabase)
+// BAR LM — MENU ENGINE (Híbrido: Local Offline + Supabase Online)
 // ══════════════════════════════════════════════════
 
 let searchTimeout;
@@ -13,51 +13,68 @@ function esc(str) {
     return d.innerHTML;
 }
 
+// === DETECCIÓN AUTOMÁTICA DE ENTORNO ===
+// Devuelve true si estamos en el router del bar (IP) o en la laptop (localhost)
+function usarApiLocal() {
+    const host = window.location.hostname;
+    return host === 'localhost' || host === '127.0.0.1' || /^[0-9\.]+$/.test(host);
+}
+
 // === CATEGORY CONFIG ===
 const CATEGORIAS = {
-    cafes_calientes:       { nombre: 'Cafés Calientes', icono: '☕', quote: '"Tu cerebro dice agua, tu corazón dice tequila, pero el reloj dice café."' },
-    cafes_frios:           { nombre: 'Cafés Fríos', icono: '🧊', quote: '' },
-    cocteles_sin_alcohol:  { nombre: 'Cocteles Sin Alcohol', icono: '🍹', quote: '"No te preguntes qué llevan. Solo confía en el bartender."' },
-    cocteles_con_alcohol:  { nombre: 'Cocteles Con Alcohol', icono: '🍸', quote: '' },
-    cocteles_vodka:        { nombre: 'Con Vodka', icono: '🍷', quote: '"Dime qué base pides y te diré quién eres."' },
-    cocteles_cerveza:      { nombre: 'Con Cerveza', icono: '🍺', quote: '' },
-    cocteles_vino:         { nombre: 'Con Vino', icono: '🍷', quote: '' },
-    cocteles_ginebra:      { nombre: 'Con Ginebra', icono: '🫒', quote: '' },
-    cocteles_tequila:      { nombre: 'Con Tequila', icono: '🌵', quote: '' },
-    cocteles_whisky:       { nombre: 'Con Whisky', icono: '🥃', quote: '' },
-    entrantes:             { nombre: 'Entrantes', icono: '🍟', quote: '"El famoso yo no tengo hambre, solo voy a picar algo empieza oficialmente aquí."' },
-    hamburguesas:          { nombre: 'Hamburguesas', icono: '🍔', quote: '' },
-    entremes:              { nombre: 'Entremés', icono: '🧀', quote: '' },
-    tacos:                 { nombre: 'Tacos Mexicanos', icono: '🌮', quote: '' },
-    pizzas:                { nombre: 'Pizzas', icono: '🍕', quote: '"Si la respuesta es pizza, la pregunta no importa."' },
-    cervezas:              { nombre: 'Cervezas', icono: '🍺', quote: '"Algunos beben para pensar. Otros para no hacerlo."' },
-    vinos:                 { nombre: 'Vinos', icono: '🍷', quote: '' },
-    refrescantes:          { nombre: 'Refrescantes', icono: '🥤', quote: '' },
-    otras_bebidas:         { nombre: 'Otras Bebidas', icono: '🥃', quote: '' },
+    cafes_calientes: { nombre: 'Cafés Calientes', icono: '☕', quote: '"Tu cerebro dice agua, tu corazón dice tequila, pero el reloj dice café."' },
+    cafes_frios: { nombre: 'Cafés Fríos', icono: '🧊', quote: '' },
+    cocteles_sin_alcohol: { nombre: 'Cocteles Sin Alcohol', icono: '🍹', quote: '"No te preguntes qué llevan. Solo confía en el bartender."' },
+    cocteles_con_alcohol: { nombre: 'Cocteles Con Alcohol', icono: '🍸', quote: '' },
+    cocteles_vodka: { nombre: 'Con Vodka', icono: '🍷', quote: '"Dime qué base pides y te diré quién eres."' },
+    cocteles_cerveza: { nombre: 'Con Cerveza', icono: '🍺', quote: '' },
+    cocteles_vino: { nombre: 'Con Vino', icono: '🍷', quote: '' },
+    cocteles_ginebra: { nombre: 'Con Ginebra', icono: '🫒', quote: '' },
+    cocteles_tequila: { nombre: 'Con Tequila', icono: '🌵', quote: '' },
+    cocteles_whisky: { nombre: 'Con Whisky', icono: '🥃', quote: '' },
+    entrantes: { nombre: 'Entrantes', icono: '🍟', quote: '"El famoso yo no tengo hambre, solo voy a picar algo empieza oficialmente aquí."' },
+    hamburguesas: { nombre: 'Hamburguesas', icono: '🍔', quote: '' },
+    entremes: { nombre: 'Entremés', icono: '🧀', quote: '' },
+    tacos: { nombre: 'Tacos Mexicanos', icono: '🌮', quote: '' },
+    pizzas: { nombre: 'Pizzas', icono: '🍕', quote: '"Si la respuesta es pizza, la pregunta no importa."' },
+    cervezas: { nombre: 'Cervezas', icono: '🍺', quote: '"Algunos beben para pensar. Otros para no hacerlo."' },
+    vinos: { nombre: 'Vinos', icono: '🍷', quote: '' },
+    refrescantes: { nombre: 'Refrescantes', icono: '🥤', quote: '' },
+    otras_bebidas: { nombre: 'Otras Bebidas', icono: '🥃', quote: '' },
 };
 
 // ══════════════════════════════════════════════════
-// 1. CARGAR MENÚ DESDE SUPABASE
+// 1. CARGAR MENÚ (Lógica Híbrida)
 // ══════════════════════════════════════════════════
 async function cargarMenu() {
     const grid = document.getElementById('menu-grid');
     if (grid) grid.innerHTML = '<p style="text-align:center; color:#9b8ab0; padding:40px;">Cargando carta...</p>';
 
     try {
-        if (typeof supabaseClient === 'undefined') {
-            throw new Error("Supabase no está conectado.");
+        let productos = [];
+
+        if (usarApiLocal()) {
+            // MODO OFFLINE: Consumir la API de la laptop
+            const response = await fetch('/api/productos');
+            if (!response.ok) throw new Error(`Error API Local: ${response.status}`);
+            productos = await response.json();
+        } else {
+            // MODO ONLINE: Consumir Supabase directamente
+            if (typeof supabaseClient === 'undefined') {
+                throw new Error("Supabase no está conectado.");
+            }
+            const { data, error } = await supabaseClient
+                .from('productos')
+                .select('*, opiniones(puntuacion)')
+                .eq('activo', true)
+                .eq('restaurant_id', CONFIG.RESTAURANT_ID)
+                .order('categoria', { ascending: true })
+                .order('destacado', { ascending: false })
+                .order('id', { ascending: false });
+
+            if (error) throw error;
+            productos = data;
         }
-
-        let { data: productos, error } = await supabaseClient
-            .from('productos')
-            .select('*, opiniones(puntuacion)')
-            .eq('activo', true)
-            .eq('restaurant_id', CONFIG.RESTAURANT_ID)
-            .order('categoria', { ascending: true })
-            .order('destacado', { ascending: false })
-            .order('id', { ascending: false });
-
-        if (error) throw error;
 
         todosLosProductos = (productos || []).map(prod => {
             const opiniones = prod.opiniones || [];
@@ -90,21 +107,20 @@ function renderizarMenu(lista) {
         return;
     }
 
-    // Collect all categories: hardcoded + any new from products
     const allCatKeys = new Set(Object.keys(CATEGORIAS));
     lista.forEach(p => { if (p.categoria) allCatKeys.add(p.categoria); });
 
     [...allCatKeys].forEach(catKey => {
-        const items = lista.filter(p => p.categoria === catKey);
-        if (items.length === 0) return;
+                const items = lista.filter(p => p.categoria === catKey);
+                if (items.length === 0) return;
 
-        const cat = CATEGORIAS[catKey] || { nombre: catKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), icono: '🍽️', quote: '' };
-        const section = document.createElement('div');
-        section.className = 'category-section';
-        section.id = `section-${catKey}`;
-        section.setAttribute('data-categoria', catKey);
+                const cat = CATEGORIAS[catKey] || { nombre: catKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), icono: '🍽️', quote: '' };
+                const section = document.createElement('div');
+                section.className = 'category-section';
+                section.id = `section-${catKey}`;
+                section.setAttribute('data-categoria', catKey);
 
-        section.innerHTML = `
+                section.innerHTML = `
             <h2 class="category-title"><span class="cat-icon">${cat.icono}</span> ${cat.nombre}</h2>
             ${cat.quote ? `<p class="category-quote">${cat.quote}</p>` : ''}
             <div class="horizontal-scroll">
@@ -117,7 +133,7 @@ function renderizarMenu(lista) {
                         <div class="card ${claseEstado}" ${clickable ? `onclick="abrirDetalle(${item.id})"` : ''}>
                             <div class="card-img-container">
                                 ${esAgotado ? '<div class="badge-agotado"><span>AGOTADO</span></div>' : ''}
-                                <img src="${item.imagen_url || 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop'}" alt="${item.nombre}" loading="lazy">
+                                <img src="${item.imagen_url || '/img/default-product.svg'}" alt="${item.nombre}" loading="lazy" onerror="this.src='/img/default-product.svg'">
                                 ${item.destacado ? '<span class="tag-top">TOP</span>' : ''}
                             </div>
                             <div class="card-body">
@@ -139,7 +155,7 @@ function renderizarMenu(lista) {
 }
 
 // ══════════════════════════════════════════════════
-// 3. DETALLE DEL PRODUCTO
+// 3. DETALLE DEL PRODUCTO (Lógica Híbrida)
 // ══════════════════════════════════════════════════
 async function abrirDetalle(id) {
     const idNum = Number(id);
@@ -149,16 +165,21 @@ async function abrirDetalle(id) {
     document.getElementById('det-titulo').textContent = productoActual.nombre;
     document.getElementById('det-desc').textContent = productoActual.descripcion || '';
     document.getElementById('det-price').textContent = productoActual.precio > 0 ? `$${productoActual.precio.toLocaleString()}` : 'GRATIS';
-    document.getElementById('det-img').src = productoActual.imagen_url || 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=400&h=300&fit=crop';
+    document.getElementById('det-img').src = productoActual.imagen_url || '/img/default-product.svg';
 
-    // Calcular promedio real desde Supabase
     try {
-        const { data: notas, error } = await supabaseClient
-            .from('opiniones')
-            .select('puntuacion')
-            .eq('producto_id', idNum);
-
-        if (error) throw error;
+        let notas = [];
+        
+        if (usarApiLocal()) {
+            const res = await fetch(`/api/opiniones?producto_id=${idNum}`);
+            if (res.ok) notas = await res.json();
+        } else {
+            const { data, error } = await supabaseClient
+                .from('opiniones')
+                .select('puntuacion')
+                .eq('producto_id', idNum);
+            if (!error && data) notas = data;
+        }
 
         let promedio = "0.0";
         let cantidad = 0;
@@ -191,7 +212,7 @@ function cerrarDetalle() {
 }
 
 // ══════════════════════════════════════════════════
-// 4. SISTEMA DE OPINIONES
+// 4. SISTEMA DE OPINIONES (Lógica Híbrida)
 // ══════════════════════════════════════════════════
 function abrirOpinion() {
     cerrarDetalle();
@@ -229,18 +250,26 @@ async function enviarOpinion() {
     btn.disabled = true;
     btn.textContent = "ENVIANDO...";
 
-    try {
-        const { error } = await supabaseClient
-            .from('opiniones')
-            .insert([{
-                producto_id: productoActual.id,
-                cliente_nombre: elNombre.value.trim() || "Anónimo",
-                comentario: elComentario.value.trim(),
-                puntuacion: puntuacionSeleccionada,
-                restaurant_id: CONFIG.RESTAURANT_ID
-            }]);
+    const payload = {
+        producto_id: productoActual.id,
+        cliente_nombre: elNombre.value.trim() || "Anónimo",
+        comentario: elComentario.value.trim(),
+        puntuacion: puntuacionSeleccionada,
+        restaurant_id: CONFIG.RESTAURANT_ID
+    };
 
-        if (error) throw error;
+    try {
+        if (usarApiLocal()) {
+            const res = await fetch('/api/opiniones', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error("Error en servidor local");
+        } else {
+            const { error } = await supabaseClient.from('opiniones').insert([payload]);
+            if (error) throw error;
+        }
 
         showToast('✅ ¡Gracias! Tu opinión ha sido enviada.');
         cerrarOpinion();
@@ -264,13 +293,21 @@ async function abrirListaOpiniones() {
     contenedor.innerHTML = '<p style="text-align:center; padding:20px; color:#9b8ab0;">Cargando...</p>';
 
     try {
-        const { data: opiniones, error } = await supabaseClient
-            .from('opiniones')
-            .select('*')
-            .eq('producto_id', productoActual.id)
-            .order('id', { ascending: false });
+        let opiniones = [];
 
-        if (error) throw error;
+        if (usarApiLocal()) {
+            const res = await fetch(`/api/opiniones?producto_id=${productoActual.id}`);
+            if (res.ok) opiniones = await res.json();
+        } else {
+            const { data, error } = await supabaseClient
+                .from('opiniones')
+                .select('*')
+                .eq('producto_id', productoActual.id)
+                .order('id', { ascending: false });
+
+            if (error) throw error;
+            if (data) opiniones = data;
+        }
 
         if (!opiniones || opiniones.length === 0) {
             contenedor.innerHTML = '<p style="text-align:center; padding:20px; color:#5e4f73;">Sin reseñas aún.</p>';
@@ -431,7 +468,6 @@ document.addEventListener('mouseover', e => {
 document.addEventListener('mouseout', e => {
     const star = e.target.closest('#stars-container span');
     if (!star) return;
-    // Restore to selected rating
     document.querySelectorAll('#stars-container span').forEach((s, i) => {
         s.classList.toggle('lit', i < puntuacionSeleccionada);
     });
