@@ -31,8 +31,12 @@ async function verificarConexion(supabaseUrl) {
         });
 
         clearTimeout(timeout);
-        return resp.ok || resp.status === 400; // Supabase puede devolver 400 sin auth, pero hay red
+        // Cualquier respuesta HTTP significa que hay internet
+        // (Supabase puede devolver 200, 301, 400, 404 — todos indican conectividad)
+        console.log('[SYNC] Respuesta de Supabase:', resp.status);
+        return resp.status > 0;
     } catch (err) {
+        console.log('[SYNC] Sin conexion:', err.message);
         return false;
     }
 }
