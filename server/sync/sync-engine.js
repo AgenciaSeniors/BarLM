@@ -22,8 +22,8 @@ const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 async function verificarConexion(supabaseUrl) {
     try {
         const controller = new AbortController();
-        // Timeout de 5 segundos para no bloquear mucho tiempo
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        // Timeout de 15 segundos (conexiones lentas como datos móviles cubanos)
+        const timeout = setTimeout(() => controller.abort(), 15000);
 
         const resp = await fetch(supabaseUrl, {
             method: 'HEAD',

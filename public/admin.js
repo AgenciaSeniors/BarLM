@@ -367,10 +367,16 @@ async function syncToSupabase() {
             method: 'POST'
         });
 
-        if (!res.ok) throw new Error('Error en sincronizacion');
+        const result = await res.json().catch(() => ({}));
 
-        const result = await res.json();
-        const msg = `Sincronizacion completada.\nProductos: ${result.productos || 0} enviados\nOpiniones: ${result.opiniones || 0} enviadas`;
+        if (!res.ok) {
+            throw new Error(result.mensaje || result.error || 'Error en sincronizacion');
+        }
+
+        const prod = result.sincronizados?.productos || 0;
+        const op   = result.sincronizados?.opiniones || 0;
+        const img  = result.sincronizados?.imagenes  || 0;
+        const msg  = `Sincronizacion completada.\nProductos: ${prod}\nImagenes: ${img}\nOpiniones: ${op}`;
         alert(msg);
 
         statusEl.textContent = 'Sincronizado';
