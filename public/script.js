@@ -104,7 +104,7 @@ function renderizarMenu(lista) {
                         <div class="card ${claseEstado}" ${clickable ? `onclick="abrirDetalle(${item.id})"` : ''}>
                             <div class="card-img-container">
                                 ${esAgotado ? '<div class="badge-agotado"><span>AGOTADO</span></div>' : ''}
-                                <img src="${item.imagen_url || '/img/default-product.jpg'}" alt="${item.nombre}" loading="lazy">
+                                <img src="${item.imagen_url || '/img/default-product.svg'}" alt="${item.nombre}" loading="lazy" onerror="this.src='/img/default-product.svg'">
                                 ${item.destacado ? '<span class="tag-top">TOP</span>' : ''}
                             </div>
                             <div class="card-body">
@@ -136,7 +136,7 @@ async function abrirDetalle(id) {
     document.getElementById('det-titulo').textContent = productoActual.nombre;
     document.getElementById('det-desc').textContent = productoActual.descripcion || '';
     document.getElementById('det-price').textContent = productoActual.precio > 0 ? `$${productoActual.precio.toLocaleString()}` : 'GRATIS';
-    document.getElementById('det-img').src = productoActual.imagen_url || '/img/default-product.jpg';
+    document.getElementById('det-img').src = productoActual.imagen_url || '/img/default-product.svg';
 
     // Fetch rating from local server
     try {

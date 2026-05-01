@@ -31,7 +31,14 @@ router.get('/', (req, res) => {
             ORDER BY p.categoria ASC, p.destacado DESC, p.id DESC
         `).all(RESTAURANT_ID);
 
-        res.json(productos);
+        // Reescribir imagen_url: si hay imagen descargada localmente, usar /uploads/
+        // Si no, dejar null para que el frontend muestre el placeholder por defecto.
+        const productosConImagen = productos.map(p => ({
+            ...p,
+            imagen_url: p.imagen_local ? `/uploads/${p.imagen_local}` : null
+        }));
+
+        res.json(productosConImagen);
     } catch (err) {
         console.error('[Productos] Error al obtener:', err.message);
         res.status(500).json({ error: 'Error al obtener productos' });

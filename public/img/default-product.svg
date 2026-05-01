@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d0d1a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a0a2e;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Fondo oscuro -->
+  <rect width="400" height="300" fill="url(#bg)"/>
+
+  <!-- Borde neon sutil -->
+  <rect x="1" y="1" width="398" height="298" fill="none" stroke="#d946ef" stroke-width="1" opacity="0.3"/>
+
+  <!-- Icono copa / bebida centrado -->
+  <g transform="translate(200,130)" filter="url(#glow)">
+    <!-- Copa -->
+    <polygon points="-35,-55 35,-55 18,10 -18,10" fill="none" stroke="#d946ef" stroke-width="2.5" opacity="0.7"/>
+    <!-- Pie de la copa -->
+    <line x1="0" y1="10" x2="0" y2="38" stroke="#d946ef" stroke-width="2.5" opacity="0.7"/>
+    <!-- Base -->
+    <line x1="-22" y1="38" x2="22" y2="38" stroke="#d946ef" stroke-width="2.5" opacity="0.7"/>
+    <!-- Brillo interior copa -->
+    <polygon points="-30,-48 30,-48 15,7 -15,7" fill="#d946ef" opacity="0.06"/>
+  </g>
+
+  <!-- Texto "SIN IMAGEN" -->
+  <text x="200" y="198" font-family="Arial, sans-serif" font-size="12" font-weight="600"
+        fill="#9b8ab0" text-anchor="middle" letter-spacing="3">SIN IMAGEN</text>
+
+  <!-- Linea decorativa neon -->
+  <line x1="160" y1="210" x2="240" y2="210" stroke="#d946ef" stroke-width="1" opacity="0.4"/>
+
+  <!-- Texto Bar LM pequeño -->
+  <text x="200" y="228" font-family="Arial, sans-serif" font-size="10"
+        fill="#6b5a7e" text-anchor="middle" letter-spacing="2">BAR LM</text>
+</svg>

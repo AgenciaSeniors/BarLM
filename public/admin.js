@@ -111,13 +111,13 @@ function renderInventario(lista) {
 
     const estadoLabel = { disponible: 'DISPONIBLE', agotado: 'AGOTADO' };
     const estadoClass = { disponible: 'badge-dispo', agotado: 'badge-agot' };
-    const defaultImg = '/img/default-product.jpg';
+    const defaultImg = '/img/default-product.svg';
 
     container.innerHTML = lista.map(p => {
         const estado = (p.estado === 'agotado') ? 'agotado' : 'disponible';
         return `
         <div class="inventory-item">
-            <img class="inv-thumb" src="${p.imagen_url || defaultImg}" alt="${esc(p.nombre)}" onerror="this.src='${defaultImg}'">
+            <img class="inv-thumb" src="${p.imagen_url || defaultImg}" alt="${esc(p.nombre)}" onerror="this.src='/img/default-product.svg'">
             <div class="inv-info">
                 <span class="inv-name">${p.destacado ? '★ ' : ''}${esc(p.nombre)}</span>
                 <span class="inv-price">$${Number(p.precio).toLocaleString('es-CU')}</span>
@@ -184,6 +184,7 @@ async function guardarProducto() {
 
     try {
         let urlImagen = null;
+        let filenameImagen = null;
 
         // Upload cropped+compressed image if available
         if (imagenRecortada) {
@@ -200,7 +201,8 @@ async function guardarProducto() {
             }
 
             const uploadData = await uploadRes.json();
-            urlImagen = uploadData.url;
+            urlImagen = uploadData.url;         // e.g. /uploads/barlm_xxx.jpg
+            filenameImagen = uploadData.filename; // e.g. barlm_xxx.jpg
         }
 
         const datos = {
@@ -212,7 +214,9 @@ async function guardarProducto() {
             destacado
         };
 
+        // Guardar imagen_local (filename) para que el servidor la sirva offline
         if (urlImagen) datos.imagen_url = urlImagen;
+        if (filenameImagen) datos.imagen_local = filenameImagen;
 
         if (idEdicion) {
             // Update existing product
