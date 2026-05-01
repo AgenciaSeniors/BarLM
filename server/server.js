@@ -43,17 +43,16 @@ app.use((req, res, next) => {
 // Archivos estáticos
 // ──────────────────────────────────────────────────
 
-// Menú público: servir la carpeta raíz del proyecto (../  desde server/)
-// Incluye index.html, style.css, script.js, config.js, logo.png, etc.
-app.use('/', express.static(path.join(__dirname, '..')));
+// Menú público: servir SOLO la carpeta public/
+// Esto garantiza que el servidor offline use únicamente los archivos
+// diseñados para funcionar sin internet (no la versión Supabase de la raíz).
+// Resultado: http://IP:3000/ → public/index.html ✓
+app.use('/', express.static(path.join(__dirname, '..', 'public')));
 
 // Imágenes subidas localmente por el admin
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Imágenes estáticas del proyecto (logo, placeholders, etc.)
-app.use('/img', express.static(path.join(__dirname, '..', 'public', 'img')));
-
-// Librerías vendor (ej: supabase-js para modo online)
+// Librerías vendor offline (Cropper.js, fuentes locales, etc.)
 app.use('/vendor', express.static(path.join(__dirname, 'vendor')));
 
 // ──────────────────────────────────────────────────
