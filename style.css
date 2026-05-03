@@ -279,21 +279,17 @@ body {
   padding: 0 20px 14px;
 }
 
-/* ═══ HORIZONTAL SCROLL ═══ */
+/* ═══ PRODUCT GRID (2 columnas verticales) ═══ */
 .horizontal-scroll {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 14px;
-  padding: 0 20px 10px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
+  padding: 0 16px 10px;
 }
-.horizontal-scroll::-webkit-scrollbar { display: none; }
 
 /* ═══ PRODUCT CARDS ═══ */
 .card {
-  flex-shrink: 0;
-  width: 165px;
+  width: 100%;
   border-radius: var(--radius-md);
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
@@ -713,7 +709,6 @@ footer {
     border-bottom: 1px solid var(--border-subtle);
     max-height: 85vh;
   }
-  .card { width: 180px; }
 }
 
 /* ═══ NEON LINE SEPARATOR ═══ */
